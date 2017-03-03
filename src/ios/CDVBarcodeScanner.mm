@@ -115,7 +115,7 @@
 - (id)initWithProcessor:(CDVbcsProcessor*)processor alternateOverlay:(NSString *)alternateXib;
 - (void)startCapturing;
 - (UIView*)buildOverlayView;
-- (UIImage*)buildReticleImage;
+- (UIImage*)buildReticleFrameImage;
 - (void)shutterButtonPressed;
 - (IBAction)cancelButtonPressed:(id)sender;
 
@@ -850,6 +850,14 @@ parentViewController:(UIViewController*)parentViewController
 //------------------------------------------------------------------------------
 // view controller for the ui
 //------------------------------------------------------------------------------
+@interface CDVbcsViewController()
+{
+    int step;
+    NSTimer * timer;
+}
+@property (nonatomic, retain) UIImageView * line;
+@end
+
 @implementation CDVbcsViewController
 @synthesize processor      = _processor;
 @synthesize shutterPressed = _shutterPressed;
@@ -880,6 +888,7 @@ parentViewController:(UIViewController*)parentViewController
 
 //--------------------------------------------------------------------------
 - (void)loadView {
+    
     self.view = [[UIView alloc] initWithFrame: self.processor.parentViewController.view.frame];
 
     // setup capture preview layer
@@ -905,6 +914,14 @@ parentViewController:(UIViewController*)parentViewController
     // this fixes the bug when the statusbar is landscape, and the preview layer
     // starts up in portrait (not filling the whole view)
     self.processor.previewLayer.frame = self.view.bounds;
+    //init scan line animation timer
+    step = 0;
+    timer = [NSTimer scheduledTimerWithTimeInterval:.02 target:self selector:@selector(scanLineAnimation) userInfo:nil repeats:YES];
+}
+
+//--------------------------------------------------------------------------
+-(void)viewDidUnload {
+    [timer invalidate];
 }
 
 //--------------------------------------------------------------------------
@@ -913,7 +930,6 @@ parentViewController:(UIViewController*)parentViewController
 
     [super viewDidAppear:animated];
 }
-
 //--------------------------------------------------------------------------
 - (void)startCapturing {
     self.processor.capturing = YES;
@@ -952,8 +968,15 @@ parentViewController:(UIViewController*)parentViewController
 
     return self.overlayView;
 }
+//--------------------------------------------------------------------------
+
+#define RETICLE_SIZE    500.0f
+#define RETICLE_WIDTH    4.0f
+#define RETICLE_OFFSET   60.0f
+#define RETICLE_ALPHA     0.4f
 
 //--------------------------------------------------------------------------
+
 - (UIView*)buildOverlayView {
 
     if ( nil != self.alternateXib )
@@ -967,7 +990,6 @@ parentViewController:(UIViewController*)parentViewController
     overlayView.autoresizesSubviews = YES;
     overlayView.autoresizingMask    = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
     overlayView.opaque              = NO;
-
     UIToolbar* toolbar = [[UIToolbar alloc] init];
     toolbar.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleTopMargin;
 
@@ -1043,18 +1065,27 @@ parentViewController:(UIViewController*)parentViewController
     [toolbar setFrame:rectArea];
 
     [overlayView addSubview: toolbar];
-
-    UIImage* reticleImage = [self buildReticleImage];
+    
+    UIImage* reticleLine =  [self buildReticleLineImage];
+    _line = [[[UIImageView alloc] initWithImage:reticleLine] autorelease];
+    
+    UIImage* reticleImage = [self buildReticleFrameImage];
     UIView* reticleView = [[[UIImageView alloc] initWithImage:reticleImage] autorelease];
     CGFloat minAxis = MIN(rootViewHeight, rootViewWidth);
-
+    
+    rectArea = CGRectMake(
+                          (CGFloat) (0.5 * (rootViewWidth  - minAxis)),
+                          RETICLE_OFFSET,
+                          minAxis,
+                          RETICLE_WIDTH
+                          );
+    [_line setFrame:rectArea];
     rectArea = CGRectMake(
         (CGFloat) (0.5 * (rootViewWidth  - minAxis)),
         (CGFloat) (0.5 * (rootViewHeight - minAxis)),
         minAxis,
         minAxis
     );
-
     [reticleView setFrame:rectArea];
 
     reticleView.opaque           = NO;
@@ -1063,56 +1094,104 @@ parentViewController:(UIViewController*)parentViewController
         | UIViewAutoresizingFlexibleLeftMargin
         | UIViewAutoresizingFlexibleRightMargin
         | UIViewAutoresizingFlexibleTopMargin
-        | UIViewAutoresizingFlexibleBottomMargin)
-    ;
+        | UIViewAutoresizingFlexibleBottomMargin);
 
+
+    
+    rectArea = CGRectMake(
+                          (CGFloat) (0.5 * (rootViewWidth  - minAxis))+RETICLE_OFFSET-2*RETICLE_WIDTH,
+                          (CGFloat) (0.5 * (rootViewHeight - minAxis))+RETICLE_OFFSET-2*RETICLE_WIDTH,
+                          minAxis-2*(RETICLE_OFFSET-2*RETICLE_WIDTH),
+                          minAxis-2*(RETICLE_OFFSET-2*RETICLE_WIDTH)
+                          );
+
+    UIView *maskView = [[UIView alloc] init];
+    maskView.frame = self.view.bounds;
+    [self.view addSubview:maskView];
+    UIBezierPath *path = [UIBezierPath bezierPathWithRoundedRect:self.view.bounds cornerRadius:0];
+    UIBezierPath *circlePath = [UIBezierPath bezierPathWithRect:rectArea];
+    [path appendPath:circlePath];
+    [path setUsesEvenOddFillRule:YES];
+    CAShapeLayer *fillLayer = [CAShapeLayer layer];
+    fillLayer.path = path.CGPath;
+    fillLayer.fillRule = kCAFillRuleEvenOdd;
+    fillLayer.fillColor = [UIColor blackColor].CGColor;
+    fillLayer.opacity = 0.7;
+    [maskView.layer addSublayer:fillLayer];
+
+    [reticleView addSubview:_line];
     [overlayView addSubview: reticleView];
-
     return overlayView;
 }
 
 //--------------------------------------------------------------------------
-
-#define RETICLE_SIZE    500.0f
-#define RETICLE_WIDTH    10.0f
-#define RETICLE_OFFSET   60.0f
-#define RETICLE_ALPHA     0.4f
+-(void)scanLineAnimation
+{
+    CGRect bounds = self.view.bounds;
+    bounds = CGRectMake(0, 0, bounds.size.width, bounds.size.height);
+    CGFloat rootViewHeight = CGRectGetHeight(bounds);
+    CGFloat rootViewWidth  = CGRectGetWidth(bounds);
+    CGFloat minAxis = MIN(rootViewHeight, rootViewWidth);
+    step ++;
+     CGRect rectArea = CGRectMake(
+                                     (CGFloat) (0.5 * (rootViewWidth  - minAxis)),
+                                     RETICLE_OFFSET + step,
+                                     minAxis,
+                                     RETICLE_WIDTH
+                                     );
+    [_line setFrame:rectArea];
+    if (step >= minAxis - 2*RETICLE_OFFSET) {
+        step = 0;
+    }
+}
 
 //-------------------------------------------------------------------------
-// builds the green box and red line
+// builds the green line
 //-------------------------------------------------------------------------
-- (UIImage*)buildReticleImage {
+
+- (UIImage *)buildReticleLineImage {
+    UIImage* result;
+    UIGraphicsBeginImageContext(CGSizeMake(RETICLE_SIZE, RETICLE_WIDTH));
+    CGContextRef context = UIGraphicsGetCurrentContext();
+    NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"CDVBarcodeScanner" withExtension:@"bundle"];
+    NSBundle *bundle = [NSBundle bundleWithURL:bundleURL];
+    NSString *imagePath = [bundle pathForResource:@"icon_qr_line" ofType:@"png"];
+    UIImage* image = [UIImage imageWithContentsOfFile:imagePath];
+    CGContextDrawImage(context,CGRectMake(RETICLE_OFFSET,
+                                          0,
+                                          RETICLE_SIZE-2*RETICLE_OFFSET,
+                                          RETICLE_WIDTH),
+                       [image CGImage]);
+    result = UIGraphicsGetImageFromCurrentImageContext();
+    UIGraphicsEndImageContext();
+    
+    return result;
+}
+
+//-------------------------------------------------------------------------
+// builds the green box
+//-------------------------------------------------------------------------
+
+
+
+
+- (UIImage*)buildReticleFrameImage {
     UIImage* result;
     UIGraphicsBeginImageContext(CGSizeMake(RETICLE_SIZE, RETICLE_SIZE));
     CGContextRef context = UIGraphicsGetCurrentContext();
-
-    if (self.processor.is1D) {
-        UIColor* color = [UIColor colorWithRed:1.0 green:0.0 blue:0.0 alpha:RETICLE_ALPHA];
-        CGContextSetStrokeColorWithColor(context, color.CGColor);
-        CGContextSetLineWidth(context, RETICLE_WIDTH);
-        CGContextBeginPath(context);
-        CGFloat lineOffset = (CGFloat) (RETICLE_OFFSET+(0.5*RETICLE_WIDTH));
-        CGContextMoveToPoint(context, lineOffset, RETICLE_SIZE/2);
-        CGContextAddLineToPoint(context, RETICLE_SIZE-lineOffset, (CGFloat) (0.5*RETICLE_SIZE));
-        CGContextStrokePath(context);
-    }
-
-    if (self.processor.is2D) {
-        UIColor* color = [UIColor colorWithRed:0.0 green:1.0 blue:0.0 alpha:RETICLE_ALPHA];
-        CGContextSetStrokeColorWithColor(context, color.CGColor);
-        CGContextSetLineWidth(context, RETICLE_WIDTH);
-        CGContextStrokeRect(context,
-                            CGRectMake(
-                                       RETICLE_OFFSET,
-                                       RETICLE_OFFSET,
-                                       RETICLE_SIZE-2*RETICLE_OFFSET,
-                                       RETICLE_SIZE-2*RETICLE_OFFSET
-                                       )
-                            );
-    }
-
+    NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"CDVBarcodeScanner" withExtension:@"bundle"];
+    NSBundle *bundle = [NSBundle bundleWithURL:bundleURL];
+    NSString *imagePath = [bundle pathForResource:@"icon_qr_code" ofType:@"png"];
+    UIImage* image = [UIImage imageWithContentsOfFile:imagePath];
+    
+    CGContextDrawImage(context,CGRectMake(RETICLE_OFFSET,
+                                          RETICLE_OFFSET,
+                                          RETICLE_SIZE-2*RETICLE_OFFSET,
+                                          RETICLE_SIZE-2*RETICLE_OFFSET),
+                       [image CGImage]);
     result = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
+    
     return result;
 }
 
