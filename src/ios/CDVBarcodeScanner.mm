@@ -899,10 +899,12 @@ parentViewController:(UIViewController*)parentViewController
     if ([previewLayer.connection isVideoOrientationSupported]) {
         [previewLayer.connection setVideoOrientation:AVCaptureVideoOrientationPortrait];
     }
-
+    
     [self.view.layer insertSublayer:previewLayer below:[[self.view.layer sublayers] objectAtIndex:0]];
-
+    
     [self.view addSubview:[self buildOverlayView]];
+    
+    [self setNavigationbar];
 }
 
 //--------------------------------------------------------------------------
@@ -967,6 +969,34 @@ parentViewController:(UIViewController*)parentViewController
     }
 
     return self.overlayView;
+}
+
+- (void)setNavigationbar
+{
+    CGRect screenRect = [[UIScreen mainScreen] bounds];
+    UINavigationBar *navigationBar = [[UINavigationBar alloc] initWithFrame:CGRectMake(0, 0, screenRect.size.width, 64)];
+    
+    [[UINavigationBar appearance] setBarTintColor:[UIColor colorWithRed:0 green:0 blue:0 alpha:0.85]];
+    [[UINavigationBar appearance] setTitleTextAttributes:@{NSForegroundColorAttributeName:[UIColor whiteColor]}];
+
+
+    UINavigationItem * navigationBarTitle = [[UINavigationItem alloc] initWithTitle:@"扫描二维码"];
+    [navigationBar pushNavigationItem: navigationBarTitle animated:YES];
+    [self.view addSubview: navigationBar];
+    
+    UIBarButtonItem *closeButton = [[[UIBarButtonItem alloc] initWithTitle:NSLocalizedString(@"关闭", @"")
+                                                                     style:UIBarButtonSystemItemCancel
+                                                                    target:self
+                                                                    action:@selector(cancelButtonPressed:)] autorelease];
+    [closeButton setTitleTextAttributes:@{NSForegroundColorAttributeName:[UIColor whiteColor]} forState:UIControlStateNormal];
+    
+    navigationBarTitle.leftBarButtonItem = closeButton;
+    [navigationBar setItems:[NSArray arrayWithObject: navigationBarTitle]];
+}
+
+- (UIStatusBarStyle)preferredStatusBarStyle
+{
+    return UIStatusBarStyleLightContent;
 }
 //--------------------------------------------------------------------------
 
@@ -1058,13 +1088,15 @@ parentViewController:(UIViewController*)parentViewController
     bounds = overlayView.bounds;
 
     [toolbar sizeToFit];
+    
+    CGFloat scanViewMarginTop = 120;
     CGFloat toolbarHeight  = [toolbar frame].size.height;
     CGFloat rootViewHeight = CGRectGetHeight(bounds);
     CGFloat rootViewWidth  = CGRectGetWidth(bounds);
     CGRect  rectArea       = CGRectMake(0, rootViewHeight - toolbarHeight, rootViewWidth, toolbarHeight);
     [toolbar setFrame:rectArea];
 
-    [overlayView addSubview: toolbar];
+//    [overlayView addSubview: toolbar];
     
     UIImage* reticleLine =  [self buildReticleLineImage];
     _line = [[[UIImageView alloc] initWithImage:reticleLine] autorelease];
@@ -1082,7 +1114,7 @@ parentViewController:(UIViewController*)parentViewController
     [_line setFrame:rectArea];
     rectArea = CGRectMake(
         (CGFloat) (0.5 * (rootViewWidth  - minAxis)),
-        (CGFloat) (0.5 * (rootViewHeight - minAxis)),
+        scanViewMarginTop,
         minAxis,
         minAxis
     );
@@ -1100,7 +1132,7 @@ parentViewController:(UIViewController*)parentViewController
     
     rectArea = CGRectMake(
                           (CGFloat) (0.5 * (rootViewWidth  - minAxis))+RETICLE_OFFSET-2*RETICLE_WIDTH,
-                          (CGFloat) (0.5 * (rootViewHeight - minAxis))+RETICLE_OFFSET-2*RETICLE_WIDTH,
+                          (CGFloat) scanViewMarginTop+RETICLE_OFFSET-2*RETICLE_WIDTH,
                           minAxis-2*(RETICLE_OFFSET-2*RETICLE_WIDTH),
                           minAxis-2*(RETICLE_OFFSET-2*RETICLE_WIDTH)
                           );
@@ -1118,7 +1150,20 @@ parentViewController:(UIViewController*)parentViewController
     fillLayer.fillColor = [UIColor blackColor].CGColor;
     fillLayer.opacity = 0.7;
     [maskView.layer addSublayer:fillLayer];
-
+    
+    rectArea = CGRectMake(
+                          0,
+                          scanViewMarginTop + minAxis-(RETICLE_OFFSET-2*RETICLE_WIDTH) + 12,
+                          minAxis,
+                          20
+                          );
+    UILabel *label = [[UILabel alloc]initWithFrame:rectArea];
+    label.font = [UIFont boldSystemFontOfSize:14.0f];
+    [label setTextColor:[UIColor colorWithRed:221 green:221 blue:221 alpha:1]];
+    label.textAlignment = NSTextAlignmentCenter;
+    [label setText:@"将二维码放入框内，即可自动扫描"];
+    [overlayView addSubview:label];
+    
     [reticleView addSubview:_line];
     [overlayView addSubview: reticleView];
     return overlayView;
