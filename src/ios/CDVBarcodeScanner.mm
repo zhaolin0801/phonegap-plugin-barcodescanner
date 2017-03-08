@@ -1000,11 +1000,11 @@ parentViewController:(UIViewController*)parentViewController
 }
 //--------------------------------------------------------------------------
 
-#define RETICLE_SIZE    500.0f
-#define RETICLE_WIDTH    4.0f
-#define RETICLE_OFFSET   60.0f
+#define RETICLE_SIZE    400.0f
+#define RETICLE_WIDTH    0.0f
+#define RETICLE_OFFSET   50.0f
 #define RETICLE_ALPHA     0.4f
-
+#define SCAN_LINE_HEIGHT    4.0f
 //--------------------------------------------------------------------------
 
 - (UIView*)buildOverlayView {
@@ -1106,18 +1106,20 @@ parentViewController:(UIViewController*)parentViewController
     CGFloat minAxis = MIN(rootViewHeight, rootViewWidth);
     
     rectArea = CGRectMake(
-                          (CGFloat) (0.5 * (rootViewWidth  - minAxis)),
                           RETICLE_OFFSET,
-                          minAxis,
-                          RETICLE_WIDTH
+                          RETICLE_OFFSET,
+                          minAxis-2*RETICLE_OFFSET,
+                          SCAN_LINE_HEIGHT
                           );
     [_line setFrame:rectArea];
     rectArea = CGRectMake(
-        (CGFloat) (0.5 * (rootViewWidth  - minAxis)),
+        RETICLE_OFFSET,
         scanViewMarginTop,
-        minAxis,
-        minAxis
+        minAxis-2*RETICLE_OFFSET,
+        minAxis-2*RETICLE_OFFSET
     );
+    
+    
     [reticleView setFrame:rectArea];
 
     reticleView.opaque           = NO;
@@ -1128,14 +1130,6 @@ parentViewController:(UIViewController*)parentViewController
         | UIViewAutoresizingFlexibleTopMargin
         | UIViewAutoresizingFlexibleBottomMargin);
 
-
-    
-    rectArea = CGRectMake(
-                          (CGFloat) (0.5 * (rootViewWidth  - minAxis))+RETICLE_OFFSET-2*RETICLE_WIDTH,
-                          (CGFloat) scanViewMarginTop+RETICLE_OFFSET-2*RETICLE_WIDTH,
-                          minAxis-2*(RETICLE_OFFSET-2*RETICLE_WIDTH),
-                          minAxis-2*(RETICLE_OFFSET-2*RETICLE_WIDTH)
-                          );
 
     UIView *maskView = [[UIView alloc] init];
     maskView.frame = self.view.bounds;
@@ -1153,7 +1147,7 @@ parentViewController:(UIViewController*)parentViewController
     
     rectArea = CGRectMake(
                           0,
-                          scanViewMarginTop + minAxis-(RETICLE_OFFSET-2*RETICLE_WIDTH) + 12,
+                          scanViewMarginTop + minAxis-2*RETICLE_OFFSET + 12,
                           minAxis,
                           20
                           );
@@ -1178,11 +1172,11 @@ parentViewController:(UIViewController*)parentViewController
     CGFloat rootViewWidth  = CGRectGetWidth(bounds);
     CGFloat minAxis = MIN(rootViewHeight, rootViewWidth);
     step ++;
-     CGRect rectArea = CGRectMake(
-                                     (CGFloat) (0.5 * (rootViewWidth  - minAxis)),
-                                     RETICLE_OFFSET + step,
-                                     minAxis,
-                                     RETICLE_WIDTH
+    CGRect rectArea = CGRectMake(
+                                     0,
+                                     step,
+                                     minAxis-2*RETICLE_OFFSET,
+                                     SCAN_LINE_HEIGHT
                                      );
     [_line setFrame:rectArea];
     if (step >= minAxis - 2*RETICLE_OFFSET) {
@@ -1196,16 +1190,16 @@ parentViewController:(UIViewController*)parentViewController
 
 - (UIImage *)buildReticleLineImage {
     UIImage* result;
-    UIGraphicsBeginImageContext(CGSizeMake(RETICLE_SIZE, RETICLE_WIDTH));
+    UIGraphicsBeginImageContext(CGSizeMake(RETICLE_SIZE, SCAN_LINE_HEIGHT));
     CGContextRef context = UIGraphicsGetCurrentContext();
     NSURL *bundleURL = [[NSBundle mainBundle] URLForResource:@"CDVBarcodeScanner" withExtension:@"bundle"];
     NSBundle *bundle = [NSBundle bundleWithURL:bundleURL];
     NSString *imagePath = [bundle pathForResource:@"icon_qr_line" ofType:@"png"];
     UIImage* image = [UIImage imageWithContentsOfFile:imagePath];
-    CGContextDrawImage(context,CGRectMake(RETICLE_OFFSET,
+    CGContextDrawImage(context,CGRectMake(0,
                                           0,
-                                          RETICLE_SIZE-2*RETICLE_OFFSET,
-                                          RETICLE_WIDTH),
+                                          RETICLE_SIZE,
+                                          SCAN_LINE_HEIGHT),
                        [image CGImage]);
     result = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
@@ -1229,10 +1223,7 @@ parentViewController:(UIViewController*)parentViewController
     NSString *imagePath = [bundle pathForResource:@"icon_qr_code" ofType:@"png"];
     UIImage* image = [UIImage imageWithContentsOfFile:imagePath];
     
-    CGContextDrawImage(context,CGRectMake(RETICLE_OFFSET,
-                                          RETICLE_OFFSET,
-                                          RETICLE_SIZE-2*RETICLE_OFFSET,
-                                          RETICLE_SIZE-2*RETICLE_OFFSET),
+    CGContextDrawImage(context,CGRectMake(0,0,RETICLE_SIZE,RETICLE_SIZE),
                        [image CGImage]);
     result = UIGraphicsGetImageFromCurrentImageContext();
     UIGraphicsEndImageContext();
